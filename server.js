@@ -16,7 +16,7 @@ app.use(function (req, res, next) {
     res.setHeader(`Access-Control-Allow-Credentials`, true);
     next();
 });
-app.listen(9090, function () { console.log(`Servidor Web rodando na porta 9090`) });
+app.listen(8080, function () { console.log(`Servidor Web rodando na porta 9090`) });
 
 app.post(`/api`, async (req, res) => {
     console.log(req.body);
