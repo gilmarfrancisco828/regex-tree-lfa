@@ -1,0 +1,1035 @@
+﻿<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <title>Máquina de Turing</title>
+  <meta name="description" content="A finite state machine chart with editable and interactive features." />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Copyright 1998-2019 by Northwoods Software Corporation. -->
+
+  <style>
+    .highlight {
+      background-color: yellow;
+    }
+
+    .nextSymbol {
+      background-color: lightgreen;
+      font-weight: bold;
+    }
+
+    .tdFita {
+      padding: .35rem;
+    }
+  </style>
+  <link rel="stylesheet" type="text/css" href="../reg_gramm/css/css_gramm.css">
+  <script src="release/go.js"></script>
+  <script type="text/javascript" src="assets/js/jquery.min.js"></script>
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+    integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+  <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"
+    integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo"
+    crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"
+    integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1"
+    crossorigin="anonymous"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"
+    integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM"
+    crossorigin="anonymous"></script>
+  <script src="https://kit.fontawesome.com/8f611551e6.js" crossorigin="anonymous"></script>
+  <script id="code">
+    var cont = 0;
+    var inicial = 0;
+    var finais = [];
+    var caminho = [];
+    var contPasso = 0;
+    var str = "";
+    var tipoMT = 0; // Tipo da maquina de turing: 0, comum, 1, Estendida
+    var numeroAuxiliar = 100;
+    var numerolistas = 2;
+    //var listas[numerolistas][numeroAuxiliar];
+
+
+    function inicializaListas() {
+      var k = 0;
+      var l = (numeroAuxiliar / 2) - 1;
+      var b = 0
+      var a = 0
+      for (; a < numerolistas; a++) {
+        for (; b < numeroAuxiliar; b++) {
+          listas[a][b] = "@"
+        }
+      }
+      while (k < str.length) {
+        listas[0][l] = str[k]
+        k++;
+        l++;
+      }
+    }
+
+    function setInitial(e, obj) {
+      myDiagram.commit(function (d) {
+        d.selection.each(function (node) {
+          var shape = node.findObject("SHAPE");
+          // If there was a GraphObject in the node named SHAPE, then set its fill to red:
+          if (shape !== null) {
+            if (inicial == 0) {
+              shape.fill = "lightgreen";
+              inicial = obj.part.data.key;
+            } else {
+              if (shape.fill == "lightgreen") {
+                shape.fill = "lightblue";
+                inicial = 0;
+              } else {
+                resetInitial(inicial);
+                shape.fill = "lightgreen";
+                inicial = obj.part.data.key;
+              }
+            }
+          }
+
+        });
+      }, "change color");
+      console.log("Inicial: " + inicial);
+    }
+    function resetInitial(key) {
+      //node = myDiagram.findNodeForKey(key);
+      myDiagram.commit(function (d) {  // this Diagram
+        // iterate over all nodes in Diagram
+        d.nodes.each(function (node) {
+          if (node.data.key === key) {
+            var shape = node.findObject("SHAPE");
+            if (shape !== null) {
+              shape.fill = "lightblue";
+            }
+          }
+        });
+
+      }, "change color");
+    }
+
+    function buscaElemFinal(vet, key) {
+      for (i = 0; i < vet.length; i++) {
+        if (vet[i] == key) {
+          vet.splice(i, 1);
+          return;
+        }
+      }
+    }
+
+    function setFinal(e, obj) {
+      myDiagram.commit(function (d) {
+        d.selection.each(function (node) {
+          var shape = node.findObject("SHAPE");
+          // If there was a GraphObject in the node named SHAPE, then set its fill to red:
+          if (shape !== null) {
+            if (shape.stroke == "blue") {
+              shape.stroke = "";
+              shape.strokeWidth = 0;
+              console.log("Retira final:" + finais);
+              buscaElemFinal(finais, obj.part.data.key);
+              console.log("Depois da remoção: " + finais);
+            } else {
+              shape.stroke = "blue";
+              shape.strokeWidth = 3;
+              finais.push(obj.part.data.key);
+              console.log("Define final :" + finais);
+            }
+          }
+        });
+      }, "change color");
+    }
+
+
+    var nameId = 0;
+
+    function idInc() {
+      nameId++;
+      var str = nameId.toString(10);
+      str = "Q" + str;
+      return (str);
+    }
+
+    function init() {
+      document.getElementById("prox").disabled = true;
+      document.getElementById("ant").disabled = true;
+      //if (window.goSamples) goSamples();  // init for these samples -- you don't need to call this
+      var $ = go.GraphObject.make;  // for conciseness in defining templates
+      var cont2 = 0;
+      myDiagram =
+        $(go.Diagram, "myDiagramDiv",  // must name or refer to the DIV HTML element
+          {
+            // have mouse wheel events zoom in and out instead of scroll up and down
+            "toolManager.mouseWheelBehavior": go.ToolManager.WheelZoom
+            // enable undo & redo
+            //"undoManager.isEnabled": true
+          });
+
+      // when the document is modified, add a "*" to the title and enable the "Save" button
+      /*myDiagram.addDiagramListener("Modified", function (e) {
+        var button = document.getElementById("SaveButton");
+        if (button) button.disabled = !myDiagram.isModified;
+        var idx = document.title.indexOf("*");
+        if (myDiagram.isModified) {
+          if (idx < 0) document.title += "*";
+        } else {
+          if (idx >= 0) document.title = document.title.substr(0, idx);
+        }
+      });*/
+
+      // define the Node template
+      myDiagram.nodeTemplate =
+        $(go.Node, "Auto",
+          new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify),
+          // define the node's outer shape, which will surround the TextBlock
+          $(go.Shape, "Circle",
+            {
+              parameter1: 20,  // the corner has a large radius
+              fill: "lightblue",
+              width: 50,
+              height: 50,
+              stroke: null,
+              name: "SHAPE",
+              portId: "",  // this Shape is the Node's port, not the whole Node
+              fromLinkable: true, fromLinkableSelfNode: true, fromLinkableDuplicates: true,
+              toLinkable: true, toLinkableSelfNode: true, toLinkableDuplicates: true,
+              cursor: "pointer"
+            }, new go.Binding("Inicial", "Teste").makeTwoWay()),
+          $(go.TextBlock,
+            {
+              font: "bold 11pt helvetica, bold arial, sans-serif",
+              editable: true  // editing the text automatically updates the model data
+            },
+            new go.Binding("text").makeTwoWay()),
+          {
+            contextMenu:     // define a context menu for each node
+              $("ContextMenu",  // that has one button
+                $("ContextMenuButton",
+                  $(go.TextBlock, "Inicial"),
+                  { click: setInitial }),
+                $("ContextMenuButton",
+                  $(go.TextBlock, "Final"),
+                  { click: setFinal })
+                // more ContextMenuButtons would go here
+              )  // end Adornment
+          }
+        );
+
+      // unlike the normal selection Adornment, this one includes a Button
+      myDiagram.nodeTemplate.selectionAdornmentTemplate =
+        $(go.Adornment, "Spot",
+          $(go.Panel, "Auto",
+            $(go.Shape, "Circle",
+              { fill: null, stroke: "green", strokeWidth: 4 }),
+            $(go.Placeholder)  // a Placeholder sizes itself to the selected Node
+          ),
+          // the button to create a "next" node, at the top-right corner
+          $("Button",
+            {
+              alignment: go.Spot.TopRight,
+              click: addNodeAndLink  // this function is defined below
+            },
+            $(go.Shape, "PlusLine", { width: 6, height: 6 })
+          ) // end button
+        ); // end Adornment
+
+      // clicking the button inserts a new node to the right of the selected node,
+      // and adds a link to that new node
+      function addNodeAndLink(e, obj) {
+        var adornment = obj.part;
+        var diagram = e.diagram;
+        diagram.startTransaction("Add State");
+
+        // get the node data for which the user clicked the button
+        var fromNode = adornment.adornedPart;
+        var fromData = fromNode.data;
+        // create a new "State" data object, positioned off to the right of the adorned Node
+        var toData = { text: idInc() };
+        var p = fromNode.location.copy();
+        p.x += 200;
+        toData.loc = go.Point.stringify(p);  // the "loc" property is a string, not a Point object
+        // add the new node data to the model
+        var model = diagram.model;
+        model.addNodeData(toData);
+
+        // create a link data from the old node data to the new node data
+        var linkdata = {
+          from: model.getKeyForNodeData(fromData),  // or just: fromData.id
+          to: model.getKeyForNodeData(toData),
+          text: "@"
+        };
+        // and add the link data to the model
+        model.addLinkData(linkdata);
+
+        // select the new Node
+        var newnode = diagram.findNodeForData(toData);
+        diagram.select(newnode);
+
+        diagram.commitTransaction("Add State");
+
+        // if the new node is off-screen, scroll the diagram to show the new node
+        diagram.scrollToRect(newnode.actualBounds);
+      }
+
+      function okNameLink(textblock, oldstr, newstr) {
+        console.log("Text " + newstr);
+        if (newstr[1] == ";" && newstr[3] == ";" && newstr.length == 5) {
+          return true;
+        }
+        return false;
+      }
+      // replace the default Link template in the linkTemplateMap
+      myDiagram.linkTemplate =
+        $(go.Link,  // the whole link panel
+          {
+            curve: go.Link.Bezier, adjusting: go.Link.Stretch,
+            reshapable: true, relinkableFrom: true, relinkableTo: true,
+            toShortLength: 3
+          },
+          new go.Binding("points").makeTwoWay(),
+          new go.Binding("curviness"),
+          $(go.Shape,  // the link shape
+            { strokeWidth: 1.5 }),
+          $(go.Shape,  // the arrowhead
+            { toArrow: "standard", stroke: null }),
+          $(go.Panel, "Auto",
+            $(go.Shape,  // the label background, which becomes transparent around the edges
+              {
+                fill: $(go.Brush, "Radial",
+                  { 0: "rgb(255, 255, 255)", 0.3: "rgb(255, 255, 255)", 1: "rgba(255, 255, 255, 0)" }),
+                stroke: null
+              }),
+            $(go.TextBlock, "@",  // the label text
+              {
+                textAlign: "center",
+                font: "9pt helvetica, arial, sans-serif",
+                margin: 4,
+                editable: true  // enable in-place editing
+                //textValidation: okNameLink
+              },
+              // editing the text automatically updates the model data
+              new go.Binding("text").makeTwoWay())
+          )
+        );
+
+      // read in the JSON data from the "mySavedModel" element
+      load();
+    }
+
+    // Show the diagram's model in JSON format
+    function simular() {
+      if (inicial != 0 && finais.length > 0) {
+        str = document.getElementById("string").value;
+        document.getElementById("mySavedModel").value = myDiagram.model.toJson();
+        var objs = JSON.parse(myDiagram.model.toJson());
+        var links = objs.linkDataArray;
+        var i;
+        console.log(objs);
+        console.log(links);
+        var texto;
+        links.forEach(function (item) {
+          texto = item.text.split("|");
+          item.text = texto;
+        });
+        links.forEach(function (item) {
+          for (i = 0; i < item.text.length; i++) {
+            console.log(item.text[i]);
+            item.text[i] = item.text[i].split(";");
+          }
+        });
+
+
+        console.log(links);
+        if (simulador2(links, -1, 0, inicial, "D")) {
+          document.getElementById("result").innerHTML = "<span style='color: green'>Aceita</span>";
+        }
+        else {
+          document.getElementById("result").innerHTML = "<span style='color: red'>Rejeitada</span>";
+        }
+      }
+      else {
+        alert("Não é possível simular o autômato finito. Pois não há um nó inicial ou pelo menos um nó final.")
+      }
+    }
+
+    function simularMultiplos() {
+      if (inicial != 0 && finais.length > 0) {
+        console.log("Simular Múltiplos");
+        document.getElementById("mySavedModel").value = myDiagram.model.toJson();
+        var objs = JSON.parse(myDiagram.model.toJson());
+        var links = objs.linkDataArray;
+        $(".resposta").remove();
+        $('input[name=strings]').each(function (index, text) {
+          str = $(this).val();
+          console.log(str + ", index: " + index);
+
+          if (simulador2(links, -1, 0, inicial, "D")) {
+            console.log("String " + str + " aceita.");
+            $(this).parent().parent('tr').css("background-color", "#d0e9c6");
+            $(this).parent().parent().children(".aceita").empty();
+            $(this).parent().parent().children(".aceita").append("<i class='fas fa-check text-success'></i>");
+          } else {
+            console.log("String " + str + " rejeitada.");
+            $(this).parent().parent('tr').css("background-color", "#f2dede");
+            $(this).parent().parent().children(".aceita").empty();
+            $(this).parent().parent().children(".aceita").append("<i class='fas fa-times text-danger'></i>");
+          }
+        }
+        );
+      }
+      else {
+        alert("Não é possível simular o autômato finito. Pois não há um nó inicial ou pelo menos um nó final.")
+      }
+    }
+
+    function load() {
+      myDiagram.model = go.Model.fromJson(document.getElementById("mySavedModel").value);
+    }
+
+    function buscaTo(obj, key) {
+      for (i = 0; i < obj.length; i++) {
+        if (obj[i].to == key) {
+          return i;
+        }
+      }
+      return 0;
+    }
+
+    function buscaFrom(obj, key) {
+      for (i = 0; i < obj.length; i++) {
+        if (obj[i].from == key) {
+          return i;
+        }
+      }
+      return 0;
+    }
+
+
+    function buscaFinal(obj, key) {
+      for (i = 0; i < obj.length; i++) {
+        if (obj[i] == key) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function destacaNo(key) {
+      myDiagram.commit(function (d) {  // this Diagram
+        // iterate over all nodes in Diagram
+        d.nodes.each(function (node) {
+          if (node.data.key === key) {
+            myDiagram.select(myDiagram.findNodeForKey(key));
+          }
+        });
+
+      }, "destaca nó");
+    }
+
+    function simulador(links, cont, from, to, ant) {
+      var i = 0;
+      caminho = [];
+      contPasso = 0;
+      if (ant != "@") cont++;
+
+      //Condição Parada
+      //console.log("\nCont: " + cont + ", str.length = " + str.length);
+      if (cont == (str.length)) { //Chegou ao último caractere da string
+        if (buscaFinal(finais, to)) {
+          //console.log("\nTerminou a string e é final");
+          caminho.push(to);
+          return true;
+        } //Terminou a string e é final (SUCESSO)
+        else {                 //Terminou a string mas não é final (Continua verificando - Volta um (pelo menos) nó)  
+          //console.log("\nTerminou a string mas não é final");
+          caminho.push(0); //Verificar os casos em que seguem-se vários símbolos vazios e depois algum que não é.
+          for (i = 0; i < links.length; i++) { //Verifica se tem símbolos vazios depois da última letra da string, para assim chegar em um final
+            if (links[i].from == to && (links[i].text == "@")) {
+              if (simulador(links, cont, links[i].from, links[i].to, links[i].text)) {
+                caminho.push(to);
+                return true;
+              }
+            }
+          }
+          caminho.push(0);
+          return false;
+        }
+      }
+      //Condição Parada
+
+      //Chamada Recursiva
+      for (i = 0; i < links.length; i++) {
+        //console.log("\nlinks[i].from = " + links[i].from + ", to = " + to + ", links[i].text = " + links[i].text + ", str[cont] = " + str[cont]);
+        //console.log("\nAceitos: ");
+        if (links[i].from == to && ((links[i].text == str[cont]) || (links[i].text == "@"))) {
+          //console.log("\nLink " + i + ": ");
+          //console.log("From: " + links[i].from + ", to: " + links[i].to + ", text: " + links[i].text);
+          if (simulador(links, cont, links[i].from, links[i].to, links[i].text)) {
+            //console.log("\nAchou filho com caractere correspondente");
+            caminho.push(to);
+            return true;
+          }
+        }
+      }
+      //Chamada Recursiva
+      //console.log("\nFinaliza transições, mas não achou o caractere");
+      caminho.push(0);
+      return false;
+    }
+
+    function trocaCaracter(novoCaracter, posicao) {
+      var aux = str.substr(0, posicao);
+      aux = aux.concat(novoCaracter);
+      aux = aux.concat(str.substr((posicao + 1), str.length));
+      str = aux;
+      $('#string').val(aux);
+    }
+
+    function simulador2(links, cont, from, to, ant) {
+      var i = 0;
+      caminho = [];
+      contPasso = 0;
+      let valorAnterior = 0;
+
+      if (ant == "D") cont++;
+      else if (ant == "E") cont--;
+
+      if (buscaFinal(finais, to)) { // Se chegou em um final, Sucesso!
+        caminho.push(to);
+        return true;
+      }
+
+
+      for (i = 0; i < links.length; i++) {
+        //console.log("\nlinks[i].from = " + links[i].from + ", to = " + to + ", links[i].text = " + links[i].text + ", str[cont] = " + str[cont]);
+        //console.log("\nAceitos: ");
+        if (cont == -1 || cont == str.length) { //Chegou em um branco
+          if (links[i].text[0][0] == "@" && links[i].from == to) {
+            if (buscaFinal(finais, links[i].to)) {
+              if (simulador2(links, cont, links[i].from, links[i].to, links[i].text[0][0][2])) {
+                caminho.push(to);
+                return true;
+              }
+            }
+          }
+        }
+
+        else {
+          if (links[i].from == to && ((links[i].text[0][0] == str[cont]))) {
+            //console.log("\nLink " + i + ": ");
+            //console.log("From: " + links[i].from + ", to: " + links[i].to + ", text: " + links[i].text);
+            if (cont >= 0 || cont < str.length) {
+              //valorAnterior = str[cont];
+              //console.log("String antes: "+str);
+              //str[cont] = links[i].text[0][1];
+              //console.log("String depois: "+str);
+              trocaCaracter(links[i].text[0][1], cont);
+            }
+            if (simulador2(links, cont, links[i].from, links[i].to, links[i].text[0][2])) {
+              //console.log("\nAchou filho com caractere correspondente");
+              caminho.push(to);
+              return true;
+            }
+            else {
+              cont--;
+              if (cont >= 0 || cont < str.length) {
+                trocaCaracter(valorAnterior, cont);
+                //str[cont] = valorAnterior;
+              }
+            }
+          }
+        }
+      }
+      caminho.push(0);
+      return false;
+
+    }
+
+
+
+    function passoapasso() {
+      console.log("Função passoapasso ->\nCaminho.length = " + caminho.length);
+      console.log("Passo: " + contPasso + ", caminho[" + (caminho.length - contPasso - 1) + "] = " + caminho[caminho.length - contPasso - 1]);
+
+      if (caminho[caminho.length - contPasso - 1] == 0) {
+        document.getElementById("string").element.style.backgroundColor = "#e18383";
+      }
+      else {
+        if (contPasso < caminho.length) {
+          if (caminho[caminho.length - contPasso - 1] == 0) {
+            document.getElementById("string").element.style.backgroundColor = "#e18383";
+          } else {
+            destacaNo(caminho[caminho.length - contPasso - 1]);
+            highlight(contPasso);
+          }
+          contPasso++;
+        }
+        else {
+          document.getElementById('prox').disabled = true;
+        }
+      }
+    }
+
+    function bloqueiaBotao() {
+      console.log("Bloqueia botão -> contPasso = " + contPasso);
+      if (contPasso >= 0) {
+        if (contPasso < caminho.length) {
+          document.getElementById("prox").disabled = false;
+        }
+        else {
+          document.getElementById("prox").disabled = true;
+        }
+
+        if (contPasso > 1) {
+          document.getElementById("ant").disabled = false;
+        }
+        else {
+          document.getElementById("ant").disabled = true;
+        }
+      }
+    }
+
+    function highlight(indice) {
+      if (indice >= 0) {
+        conteudo = str.substring(0, indice) + "<span class='highlight'>" + str.substring(indice, indice + 1) + "</span>" + str.substring(indice + 1);
+        document.getElementById("string").innerText = conteudo;
+      }
+    }
+
+    function pesquisa(vetor, chave) {
+      var i;
+      for (i = 0; i < vetor.length; i++) {
+        if (vetor[i] == chave) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function pesquisaVetor(matriz, vetor) {
+      var i, j, cont;
+      for (i = 0; i < matriz.length; i++) {
+        cont = 0;
+        if (matriz[i].length == vetor.length) {
+          for (j = 0; j < vetor.length; j++) {
+            if (pesquisa(matriz[i], vetor[j])) {
+              cont++;
+            }
+          }
+          if (cont == vetor.length) {
+            return i;
+          }
+        }
+      }
+      return -1;
+    }
+
+    function pesquisaIndice(vetor, chave) {
+      var i;
+      for (i = 0; i < vetor.length; i++) {
+        if (vetor[i].text == chave) return vetor[i].key;
+      }
+      return 0;
+    }
+
+    function setInitial2(key) {
+      myDiagram.commit(function (d) {  // this Diagram
+        // iterate over all nodes in Diagram
+        d.nodes.each(function (node) {
+          if (node.data.key === key) {
+            var shape = node.findObject("SHAPE");
+            // If there was a GraphObject in the node named SHAPE, then set its fill to red:
+            if (shape !== null) {
+              if (inicial == 0) {
+                shape.fill = "lightgreen";
+                inicial = key;
+              } else {
+                if (shape.fill == "lightgreen") {
+                  shape.fill = "lightblue";
+                  inicial = 0;
+                } else {
+                  resetInitial(inicial);
+                  shape.fill = "lightgreen";
+                  inicial = key;
+                }
+              }
+            }
+          }
+        });
+      }, "destaca nó");
+    }
+
+    function setFinal2(key) {
+      myDiagram.commit(function (d) {  // this Diagram
+        // iterate over all nodes in Diagram
+        d.nodes.each(function (node) {
+          if (node.data.key === key) {
+            var shape = node.findObject("SHAPE");
+            // If there was a GraphObject in the node named SHAPE, then set its fill to red:
+            if (shape !== null) {
+              if (shape.stroke == "blue") {
+                shape.stroke = "";
+                shape.strokeWidth = 0;
+                console.log("Retira final:" + finais);
+                buscaElemFinal(finais, key);
+                console.log("Depois da remoção: " + finais);
+              } else {
+                shape.stroke = "blue";
+                shape.strokeWidth = 3;
+                finais.push(key);
+                console.log("Define final :" + finais);
+              }
+            }
+          }
+        }, "change color");
+      });
+    }
+
+    $(document).ready(function () {
+      //var max_fields = 10; //maximum input boxes allowed
+      var wrapper = $(".input_fields_wrap"); //Fields wrapper
+      var add_button = $(".add_field_button"); //Add button ID
+
+      var x = 1; //initlal text box count
+      $(add_button).click(function (e) { //on add input button click
+        e.preventDefault();
+        //if (x < max_fields) { //max input box allowed
+        x++; //text box increment
+        $("#mult").append('<tr><td><input type="text" name="strings" onkeyup="simularMultiplos()"></td><td class="aceita"></td><td align="center"><a href="#" class="remove_field"><i class="fas fa-trash-alt"></i></a></td></tr>'); //add input box
+        //}
+      });
+
+      $(wrapper).on("click", ".remove_field", function (e) { //user click on remove text
+        e.preventDefault(); $(this).parent().parent('tr').remove(); x--;
+      })
+    });
+
+    function CapturaParametrosUrl() {
+      var url = window.location.href;
+      var res = url.split('?');
+      document.getElementById("mySavedModel").value = myDiagram.model.toJson();
+      var objs = JSON.parse(myDiagram.model.toJson());
+
+      if (res[1] !== undefined) {
+        var parametros = res[1].split('=');
+        if (parametros[0] == 'remetente' && (parametros[1] == "gramatica" || parametros[1] == "expressao_r")) {
+          var estados = JSON.parse(sessionStorage.getItem('est'));
+          var transicoes = JSON.parse(sessionStorage.getItem('tr'));
+          console.log(estados);
+          console.log(transicoes);
+          var i;
+          objs.nodeDataArray.splice(0, objs.nodeDataArray.length);
+          for (i = 0; i < estados.length; i++) {
+            objs.nodeDataArray.push({ text: estados[i], key: (i + 1) * -1 });
+          }
+          objs.linkDataArray.splice(0, objs.linkDataArray.length);
+          for (i = 0; i < transicoes.length; i++) {
+            var de, para;
+            if (parametros[1] == "expressao_r") {
+              de = (transicoes[i][0] + 1) * -1;
+              para = (transicoes[i][1] + 1) * -1;
+            }
+            else {
+              de = pesquisaIndice(objs.nodeDataArray, transicoes[i][0]);
+              para = pesquisaIndice(objs.nodeDataArray, transicoes[i][1]);
+            }
+            objs.linkDataArray.push({ from: de, to: para, text: transicoes[i][2] });
+          }
+          document.getElementById("mySavedModel").value = JSON.stringify(objs);
+          console.log(JSON.stringify(objs));
+          load();
+          var ini, fim;
+          if (parametros[1] == "expressao_r") {
+            ini = (JSON.parse(sessionStorage.getItem('inicial')) + 1) * -1;
+            fim = (JSON.parse(sessionStorage.getItem('final')) + 1) * -1;
+          }
+          else {
+            ini = pesquisaIndice(objs.nodeDataArray, 'S');
+            fim = pesquisaIndice(objs.nodeDataArray, 'Final');
+          }
+          setInitial2(ini);
+          setFinal2(fim);
+        }
+      }
+    }
+
+    function toXML() {
+      document.getElementById("mySavedModel").value = myDiagram.model.toJson();
+      var objs = JSON.parse(myDiagram.model.toJson());
+
+      objs.linkDataArray.forEach(function (item) {
+        texto = item.text.split(";");
+        item.text = texto;
+      });
+      var xml = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?><!--Created with JFLAP 7.1.--><structure>&#13;<type>turing</type>&#13\;<automaton>&#13\;<!--The list of states.-->&#13;";
+      var i, loc;
+      for (i = 0; i < objs.nodeDataArray.length; i++) {
+        loc = objs.nodeDataArray[i].loc.split(' ');
+        xml += "<state id=\"" + ((objs.nodeDataArray[i].key * -1) - 1) + "\" name=\"" + objs.nodeDataArray[i].text + "\">&#13;<x>" + loc[0].substr(0, 5) + "</x>&#13;<y>" + loc[1].substr(0, 5) + "</y>&#13;";
+        if (objs.nodeDataArray[i].key == inicial) {
+          xml += "<initial/>&#13;";
+        }
+        if (pesquisa(finais, objs.nodeDataArray[i].key)) {
+          xml += "<final/>&#13;";
+        }
+        xml += "</state>&#13;";
+      }
+      xml += "<!--The list of transitions.-->&#13;";
+      for (i = 0; i < objs.linkDataArray.length; i++) {
+        xml += "<transition>&#13;<from>" + ((objs.linkDataArray[i].from * -1) - 1) + "</from>&#13;<to>" + ((objs.linkDataArray[i].to * -1) - 1) + "</to>&#13;";
+        if (objs.linkDataArray[i].text[0] == '@') {
+          xml += "<read/>&#13;";
+        }
+        else {
+          xml += "<read>" + objs.linkDataArray[i].text[0] + "</read>&#13;";
+        }
+        if (objs.linkDataArray[i].text[1] == '@') {
+          xml += "<write/>&#13;";
+        }
+        else {
+          xml += "<write>" + objs.linkDataArray[i].text[1] + "</write>&#13;";
+        }
+
+        if (objs.linkDataArray[i].text[2] == "P") {
+          xml += "<move>S</move>&#13;";
+        }
+        if (objs.linkDataArray[i].text[2] == "E") {
+          xml += "<move>L</move>&#13;";
+        }
+        if (objs.linkDataArray[i].text[2] == "D") {
+          xml += "<move>R</move>&#13;";
+        }
+
+        xml += "</transition>&#13;";
+      }
+      xml += "</automaton>&#13;</structure>";
+      parser = new DOMParser();
+      //xml = parser.parseFromString(xml, "text/xml");
+      console.log(xml);
+
+      var saveData = (function () {
+        var a = document.createElement("a");
+        document.body.appendChild(a);
+        a.style = "display: none";
+        return function (data, fileName) {
+          blob = new Blob([data], { type: " text / plain; charset = utf-8 " }),
+            url = window.URL.createObjectURL(blob);
+          a.href = url;
+          a.download = fileName;
+          a.click();
+          window.URL.revokeObjectURL(url);
+        };
+      }());
+      var data = xml,
+        fileName = "Turing.jff";
+
+      saveData(data, fileName);
+
+    }
+
+    function readFile(file) {
+      return new Promise((resolve, reject) => {
+        let fr = new FileReader();
+        fr.onload = x => resolve(fr.result);
+        fr.readAsText(file);
+      })
+    }
+
+    async function read(input) {
+      var msg = await readFile(input.files[0]);
+      console.log(msg);
+
+      parser = new DOMParser();
+      xmlDoc = parser.parseFromString(msg, "text/xml");
+      document.getElementById("mySavedModel").value = myDiagram.model.toJson();
+      var objs = JSON.parse(myDiagram.model.toJson());
+      console.log(objs);
+      objs.linkDataArray.forEach(function (item) {
+        texto = item.text.split(";");
+        item.text = texto;
+      });
+      var i, simbolo = [3], ini, fim = [];
+      var elementos = xmlDoc.getElementsByTagName('state');
+      var transicoes = xmlDoc.getElementsByTagName('transition');
+      console.log(elementos);
+      objs.nodeDataArray.splice(0, objs.nodeDataArray.length);
+      objs.linkDataArray.splice(0, objs.linkDataArray.length);
+      for (i = 0; i < elementos.length; i++) {
+        if (elementos[i].getElementsByTagName('initial').length > 0) {
+          ini = (elementos[i].getAttribute('id') + 1) * -1;
+        }
+        if (elementos[i].getElementsByTagName('final').length > 0) {
+          fim.push((elementos[i].getAttribute('id') + 1) * -1);
+        }
+        objs.nodeDataArray.push({ text: elementos[i].getAttribute('name'), key: (elementos[i].getAttribute('id') + 1) * -1, loc: elementos[i].getElementsByTagName('x')[0].innerHTML + ' ' + elementos[i].getElementsByTagName('y')[0].innerHTML });
+      }
+      for (i = 0; i < transicoes.length; i++) {
+        simbolo[0] = transicoes[i].getElementsByTagName('read')[0].innerHTML;
+        simbolo[1] = transicoes[i].getElementsByTagName('write')[0].innerHTML;
+        simbolo[2] = transicoes[i].getElementsByTagName('move')[0].innerHTML;
+        if (simbolo[0] == "") {
+          simbolo[0] = "@";
+        }
+        if (simbolo[1] == "") {
+          simbolo[1] = "@";
+        }
+        if (simbolo[2] == "S") {
+          simbolo[2] = "P";
+        }
+        if (simbolo[2] == "L") {
+          simbolo[2] = "E";
+        }
+        if (simbolo[2] == "R") {
+          simbolo[2] = "D";
+        }
+        objs.linkDataArray.push({ from: (transicoes[i].getElementsByTagName('from')[0].innerHTML + 1) * -1, to: (transicoes[i].getElementsByTagName('to')[0].innerHTML + 1) * -1, text: (simbolo[0] + ";" + simbolo[1] + ";" + simbolo[2]) });
+      }
+      document.getElementById("mySavedModel").value = JSON.stringify(objs);
+      console.log(JSON.stringify(objs));
+      load();
+      setInitial2(ini);
+      for (i = 0; i < fim.length; i++) {
+        setFinal2(fim[i]);
+      }
+    }
+
+
+  </script>
+</head>
+
+<body onload="init(); CapturaParametrosUrl();">
+
+  <div class="header">
+    <h2 class="text-center"> Máquina de Turing </h2>
+  </div>
+  <br>
+
+  <div id="sample" class="col-md-8 float-left">
+    <div id="myDiagramDiv" style="border: solid 1px black; width: 100%; height: 500px"></div>
+  </div>
+
+  <div class="col-md-4 float-right">
+    <div>
+      <table class="table table-striped table-bordered">
+        <thead>
+          <tr>
+            <th class="text-center" colspan="3">
+              Entrada única
+            </th>
+          </tr>
+          <tr>
+            <th scope="col">String</th>
+            <th scope="col"></th>
+            <th scope="col">Resultado</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><input class="form-control" type="text" id="string" /></td>
+            <td><button class="btn btn-primary" id="SaveButton" onclick="simular()">Verificar</button></td>
+            <td>
+              <div id="result"></div>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="3">
+              <div>
+                <span>Fita:</span>
+                <div id="fita" type="text" class="input-div input-block-level monospaceRegex"
+                  placeholder="See if this fits">
+                  <font class="nextSymbol">b</font>aa
+                </div>
+                <table border="1">
+                  <tr>
+                    <td class="tdFita">a</td>
+                    <td class="tdFita">b</td>
+                    <td class="tdFita">c</td>
+                    <td class="tdFita">a</td>
+                    <td class="tdFita">b</td>
+                    <td class="tdFita">c</td>
+                    <td class="tdFita">a</td>
+                    <td class="tdFita">b</td>
+                    <td class="tdFita">c</td>
+                    <td class="tdFita">a</td>
+                    <td class="tdFita">b</td>
+                    <td class="tdFita">c</td>
+                    <td class="tdFita">a</td>
+                    <td class="tdFita">b</td>
+                    <td class="tdFita">c</td>
+                    <td class="tdFita">a</td>
+                    <td class="tdFita">b</td>
+                    <td class="tdFita">c</td>
+                    <td class="tdFita">a</td>
+                    <td class="tdFita">b</td>
+                    <td class="tdFita">c</td>
+                  </tr>
+                </table>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td align="center" colspan="3">
+              <button class="btn btn-secondary" id="comecar"
+                onclick="simular(); passoapasso(); bloqueiaBotao();">Simular</button>
+              <button class="btn btn-secondary" id="ant"
+                onclick="contPasso--;contPasso--;passoapasso(); bloqueiaBotao();">Anterior</button>
+              <button class="btn btn-secondary" id="prox" onclick="passoapasso(); bloqueiaBotao();">Próximo</button>
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+      <!--<button onclick="load()">Load</button>-->
+    </div>
+    <textarea id="mySavedModel" style="width:100%;height:300px;display: none;">
+      { "class": "GraphLinksModel",
+        "nodeDataArray": [ 
+      {"text":"Q0", "key":-1, "loc":"479 207.8181915283203"}
+      ],
+        "linkDataArray": [ 
+      ]}
+    </textarea>
+    <br><br>
+    <div class="input_fields_wrap">
+      <table class="table table-striped table-bordered" id="multiplos">
+        <thead>
+          <tr>
+            <th class="text-center" colspan="3">
+              Múltiplas entrada
+            </th>
+          </tr>
+          <tr>
+            <th scope="col">String</th>
+            <th scope="col">Aceita</th>
+            <th scope="col" align="center">Remover</th>
+          </tr>
+        </thead>
+        <tbody id="mult">
+          <tr>
+            <td><input type="text" name="strings" onkeyup="simularMultiplos()"></td>
+            <td class="aceita"></td>
+            <td></td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td align="center" colspan="3">
+              <button class="add_field_button btn btn-primary">Adicionar mais campos</button>
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-body">
+      Importar arquivo XML:
+      <input type="file" onchange="read(this)" />
+      -------------
+      <button class="btn btn-secondary" onclick="toXML()">Exportar para arquivo XML</button>
+    </div>
+  </div>
+</body>
+
+</html>
